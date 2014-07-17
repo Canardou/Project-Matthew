@@ -11,11 +11,6 @@ class SysTime {
 
 public:
 
-    /**
-     * 
-     * Return the system timer manager.
-     * 
-    **/
     static SysTime *getSysTime () ;
 
 public:
@@ -24,26 +19,18 @@ public:
     static const int SYS_TIME_FREQUENCY = 1000 ;
     
     /**
-     * 
-     * Register a new system timer. Only #SYS_TIME_NB_TIMER can be registered.
-     * 
+     * Register a new system timer.
      * @param duration Duration in seconds until the timer elapses.
-     * @param cb Callback function that is called from the ISR when timer elapses, or 0.
-     * 
-     * @return -1 if it failed, the timer id otherwise.
-     * 
-    **/
+     * @param cb Callback function that is called from the ISR when timer elapses, or NULL
+     * @return -1 if it failed, the timer id otherwise
+     */
     int registerTimer (float duration, SysTimeCB cb);
     
     /**
-     * 
-     * Check if the specified timer has elapsed.
-     * 
-     * @param id Timer id.
-     * 
-     * @return true if timer has elapsed, false otherwise.
-     * 
-    **/
+     * Check if timer has elapsed.
+     * @param id Timer id
+     * @return true if timer has elapsed
+     */
     bool checkAndAckTimer (tid_t id);
 
 private:

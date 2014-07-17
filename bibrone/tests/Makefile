@@ -1,13 +1,13 @@
 DEBUG=no
 
-CPP=/usr/local/carlson-minot/crosscompilers/bin/arm-none-linux-gnueabi-g++
+CPP=/home/ohachett/CodeSourcery/bin/arm-none-linux-gnueabi-g++
 
-PAPARAZZI_PATH=".."
+BIBRONE_PATH=".."
 
-INCLUDES=-I$(PAPARAZZI_PATH)/include/
+INCLUDES=-I$(BIBRONE_PATH)/include/
 DRONEFLAGS= -march=armv7-a
 CFLAGS =-W -Wall -Wextra $(DRONEFLAGS) $(INCLUDES)
-LDFLAGS =-L$(PAPARAZZI_PATH)/lib -lpaparazzi -lm
+LDFLAGS =-L$(BIBRONE_PATH)/lib -lbibrone -lm
 
 SRC=  $(wildcard *.cpp)
 EXEC= $(SRC:.cpp=.elf)

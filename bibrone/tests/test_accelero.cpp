@@ -32,7 +32,7 @@ int main () {
 
 	Navdata::AHRS::setSamplePeriod (10000) ;
 	Navdata::AHRS::setKp (0.2) ;
-	Navdata::AHRS::setKi (0.0) ;
+	Navdata::AHRS::setKis (0.0,0.0,0.0) ;
 
     systime->registerTimer (0.001, updateNavdata);	
 	systime->registerTimer (0.01, updateAHRS);

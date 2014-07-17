@@ -1,6 +1,7 @@
-#include "../src/Actuators.h"
-#include "../src/Navdata.h"
-
+#include <bibrone/Actuators.h>
+#include <bibrone/Navdata.h>
+#include <bibrone/ahrs.h>
+#include <../src/ahrs.cpp>
 #include <iostream>
 
 #include <unistd.h>
@@ -10,104 +11,116 @@
 
 #include <algorithm>
 
-int main () {
 
-    int udt ;
+#include <vector>
+#include <float.h>
 
-    if (!Navdata::init ()) {
-        std::cerr << "Error initializing navdata." << std::endl ;
-        return 1 ;
-    }
+void printR(int n, std::vector< std::vector<float> > V){
+	printf("%*d \n",(int)V.size()*6,n);
+	printf("╭‒‒‒‒‒‒‒‒‒");
+	for(unsigned int i=1;i<V[0].size();i++){
+		printf("┬‒‒‒‒‒‒‒‒‒");
+	}
+	printf("╮\n");
+	for(unsigned int i=0;i<V.size();i++){
+		for(unsigned int j=0;j<V[i].size();j++){
+			printf("│%9.2g",V[i][j]);
+		}
+		printf("│\n");
+		if(i+1<V.size()){
+			printf("├‒‒‒‒‒‒‒‒‒");
+			for(unsigned int j=1;j<V[i].size();j++){
+				printf("┼‒‒‒‒‒‒‒‒‒");
+			}
+			printf("┤\n");
+		}
+	}
+	printf("╰‒‒‒‒‒‒‒‒‒");
+	for(unsigned int i=1;i<V[V.size()-1].size();i++){
+		printf("┴‒‒‒‒‒‒‒‒‒");
+	}
+	printf("╯\n");
+}
 
-    std::cout << "Starting loop... " << std::endl ;
+void printR(int n, std::vector<float> V){
+	printf("%*d \n",(int)V.size()*6,n);
+	printf("╭‒‒‒‒‒‒‒‒‒");
+	for(unsigned int i=1;i<V.size();i++){
+		printf("┬‒‒‒‒‒‒‒‒‒");
+	}
+	printf("╮\n");
+	for(unsigned int j=0;j<V.size();j++){
+		printf("│%9.2g",V[j]);
+	}
+	printf("│\n");
 
-    Navdata::AHRS::setSamplePeriod(4000) ;
-    Navdata::AHRS::setKp(5.0) ;
-    Navdata::AHRS::setKi(0.05) ;  // (0.002) ;
+	printf("╰‒‒‒‒‒‒‒‒‒");
+	for(unsigned int i=1;i<V.size();i++){
+		printf("┴‒‒‒‒‒‒‒‒‒");
+	}
+	printf("╯\n");
+}
 
-    int i = 1 ;
-    bool init = false ;
-    float gx = 0, gy = 0, gz = 0 ;
-    float grx = 0, gry = 0, grz = 0 ;
+int main(){
+	FILE * file;
+	float gx = 0, gy = 0, gz = 0 ;
+	float mx = 0, my = 0, mz = 0 ;
+	float ax = 0, ay = 0, az = 0 ;
+	//IMU
+	Navdata::init();
+	//AHRS
+	ahrs test;
+	test.Initialize();
+	test.SetQuaternion(true);
+	test.SetKalman(false);
+	//Fin d'initialisation
+	file=std::fopen("samples.csv","w");
+	std::fprintf(file,"mx	my	mz	ax	ay	az	gx	gy	gz	qw	qx	qy	qz	phi	the	psy\n");
+	//Boucle de récupérations de données
+	int j=0;
+	int k=0;
+	int i=0;
+	while (j<=10000) {
+		Navdata::update () ;
+		Navdata::IMU::update () ;
 
-    const int16_t OFFSET_X = -73 ;
-    const int16_t OFFSET_Y =  14 ;
-    const int16_t OFFSET_Z = -13 ;
+		gx = Navdata::IMU::Gyroscope::getX();
+		gy = Navdata::IMU::Gyroscope::getY();
+		gz = Navdata::IMU::Gyroscope::getZ();
 
-    const int16_t NOISE_X = 35 ;
-    const int16_t NOISE_Y = 35 ;
-    const int16_t NOISE_Z = 15 ;
+		ax = Navdata::IMU::Accelerometer::getX();
+		ay = -Navdata::IMU::Accelerometer::getY();
+		az = -Navdata::IMU::Accelerometer::getZ();
 
-    const float SENSIBILITY = 0.0609 ;
+		mx = -Navdata::IMU::Magnetometer::getY();
+		my = Navdata::IMU::Magnetometer::getX();
+		mz = Navdata::IMU::Magnetometer::getZ();
 
-    while (1) {/*
+		test.UpdateAccelerometer(ax,ay,az);
+		test.UpdateMagnetometer(mx,my,mz);
+		test.UpdateGyrometer(gx,gy,gz);
 
-        Navdata::update () ;
+		k++;
+		if(k==5){
+			test.Update();
+			k=0;
+		}
 
-        Navdata::IMU::update () ;
+		if(j>5000 && j<=10000)
+			std::fprintf(file,"%f	%f	%f	%f	%f	%f	%f	%f	%f	%f	%f	%f	%f	%f	%f	%f\n"
+					,mx,my,mz,ax,ay,az,gx,gy,gz,
+					test.GetQuaternion()[0],test.GetQuaternion()[1],test.GetQuaternion()[2],test.GetQuaternion()[3],
+					test.GetEuler()[0],test.GetEuler()[1],test.GetEuler()[2]);
 
-        gx += Navdata::IMU::Gyroscope::getX() * 0.002 * 180.0 / M_PI ;
-        gy += Navdata::IMU::Gyroscope::getY() * 0.002 * 180.0 / M_PI  ;
-        gz += Navdata::IMU::Gyroscope::getZ() * 0.002 * 180.0 / M_PI  ;
-
-        int16_t vx = Navdata::IMU::Gyroscope::getRawX () - OFFSET_X ;
-        int16_t vy = Navdata::IMU::Gyroscope::getRawY () - OFFSET_Y ;
-        int16_t vz = Navdata::IMU::Gyroscope::getRawZ () - OFFSET_Z ;
-
-        if (abs(vx) > NOISE_X) {
-            grx += (float) vx * SENSIBILITY * 0.002 ; 
-        }
-
-        if (abs(vy) > NOISE_Y) {
-            gry += (float) vy * SENSIBILITY * 0.002 ; 
-        }
-
-        if (abs(vz) > NOISE_Z) {
-            grz += (float) vz * SENSIBILITY * 0.002 ; 
-        }
-
-        if (i++%250 == 0) {
-            printf("\r%8f %8f - %8f %8f - %8f %8f", gx, grx, gy, gry, gz, grz) ;
-            fflush(stdout) ;
-        }
-
-        usleep(2000) ;
-        */
-        
-        if (i%2500 == 0 && !init) {
-            init = true ;
-            printf("Initialization: OK\n") ;
-            Navdata::AHRS::setKp(0.5) ; // (0.0368) ;
-        }
-
-        struct timeval start, end ;
-        
-        gettimeofday(&start, NULL) ;
-
-        Navdata::update () ;
-
-        if (i%2 == 0) {
-            Navdata::IMU::update () ;
-            Navdata::AHRS::updateWithMag () ;
-        }
-
-        if (i%250 == 0) {
-            struct Navdata::AHRS::EulerAngles eangles  = Navdata::AHRS::getEulerAngles() ;
-            printf("\r%8f %8f %8f", eangles.phi * 180.0 / M_PI, eangles.rho * 180.0 / M_PI, eangles.tetha * 180.0 / M_PI) ;
-            fflush(stdout) ;
-        }
-
-        gettimeofday(&end, NULL) ;
-        udt = ((float)(end.tv_sec - start.tv_sec)) * 1e6 + (end.tv_usec - start.tv_usec) ;
-
-        if (udt < 2000) {
-            usleep(2000 - udt) ;
-        }
-
-        i++ ;
-
-    }
-    
-    return 0 ;
-
+		if(i>=100)
+		{
+			printR(j,test.GetEuler());
+			i=0;
+		}
+		i++;
+		j++;
+		usleep(2000);
+	}
+	std::fclose(file);
+	return 0;
 }
