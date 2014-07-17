@@ -135,8 +135,15 @@ void ahrs::UpdateGyrometer(float gp, float gq, float gr){
 	temp[0]=gp;
 	temp[1]=gq;
 	temp[2]=gr;
-	for(int i = 0;i<3;i++){
-		gyro[i] = gyro[i]*3/4 + temp[i]/4;//Low pass
+	if(!kalman_filter){
+		for(int i = 0;i<3;i++){
+			gyro[i] = gyro[i]*3/4 + temp[i]/4;//Low pass
+		}
+	}
+	else{
+		for(int i = 0;i<3;i++){
+			gyro[i] = temp[i];//Low pass
+		}
 	}
 }
 
@@ -674,4 +681,6 @@ void ahrs::Etalonnage(){
 	fclose(file);
 	printf("\n");
 	printf("Etalonnage terminé\n");
+	initialized=true;
+	this->Initialize();
 }

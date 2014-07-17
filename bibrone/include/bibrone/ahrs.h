@@ -38,10 +38,10 @@ public:
 		 * Empiriquement Kp=15 Ki=100
 		 */
 		dt=0.010;
-		Kp=1;
-		Ki=0.2;
+		Kp=0.3;
+		Ki=2;
 		Ka=1;
-		Km=1;
+		Km=0.2;
 		Kt=1;
 		Kal=1;
 		for(int i=0;i<3;i++)
