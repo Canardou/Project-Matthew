@@ -12,6 +12,17 @@
 #include <cstdlib>
 #include <iostream>
 #include <fstream>
+#include <pthread.h>
+#include <errno.h>
+#include <time.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/timerfd.h>
+
+
+#define handle_error_en(en, msg) \
+    do { errno = en; perror(msg); exit(EXIT_FAILURE); } while (0)
+
 
 #ifndef AHRS_HPP_
 #define AHRS_HPP_

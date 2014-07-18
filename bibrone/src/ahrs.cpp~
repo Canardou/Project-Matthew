@@ -832,7 +832,7 @@ static void *thread_cor(void *parametres)
 	while(1)
 	{
 		pthread_mutex_lock(&mutex);
-		pp->nouveau->Update();
+		pp.nouveau->Update();
 		pthread_mutex_unlock(&mutex);
 		wait_period (&info);	
 	}
