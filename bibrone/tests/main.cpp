@@ -72,7 +72,7 @@ int main(){
 	ahrs test;
 	test.Initialize();
 	test.SetQuaternion(true);
-	test.SetKalman(false);
+	test.SetKalman(true);
 	//Fin d'initialisation
 	file=std::fopen("samples.csv","w");
 	std::fprintf(file,"mx	my	mz	ax	ay	az	gx	gy	gz	qw	qx	qy	qz	phi	the	psy\n");

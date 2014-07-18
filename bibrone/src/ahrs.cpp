@@ -47,7 +47,7 @@ void ahrs::Initialize(){
 		}
 	}
 	Qua=ahrs::MatToQua(R);
-	Q[0][0]=Q[1][1]=0.000001;
+	Q[0][0]=Q[1][1]=0.001;
 	Q[1][0]=Q[0][1]=0;
 	for(int i=0;i<3;i++){
 		for(int j=0;j<2;j++){
@@ -95,14 +95,21 @@ void ahrs::UpdateMagnetometer(float mx, float my, float mz){
 		temp[1]=(my-min_magn[1]/2)/(max_magn[1]-min_magn[1]);
 		temp[2]=(mz-min_magn[2]/2)/(max_magn[2]-min_magn[2]);
 	}
-	for(int i = 0;i<3;i++){
-		magn[i] = magn[i]*3/4 + temp[i]/4;//Low pass
+	if(!kalman_filter){
+		for(int i = 0;i<3;i++){
+			magn[i] = magn[i]*3/4 + temp[i]/4;//Low pass
+		}
+		float norme = pow_sum(magn);
+		norme = sqrt(norme);
+		if(norme>0){
+			for(int i=0;i<3;i++){
+				magn[i]/=norme;
+			}
+		}
 	}
-	float norme = pow_sum(magn);
-	norme = sqrt(norme);
-	if(norme>0){
-		for(int i=0;i<3;i++){
-			magn[i]/=norme;
+	else{
+		for(int i = 0;i<3;i++){
+			magn[i] = temp[i];
 		}
 	}
 }
@@ -115,14 +122,21 @@ void ahrs::UpdateAccelerometer(float ax, float ay, float az){
 	temp[0]=ax;
 	temp[1]=ay;
 	temp[2]=az;
-	for(int i = 0;i<3;i++){
-		accel[i] = accel[i]*3/4 + temp[i]/4;//Low pass
+	if(!kalman_filter){
+		for(int i = 0;i<3;i++){
+			accel[i] = accel[i]*3/4 + temp[i]/4;//Low pass
+		}
+		float norme = pow_sum(accel);
+		norme = sqrt(norme);
+		if(norme>0){
+			for(int i=0;i<3;i++){
+				accel[i]/=norme;
+			}
+		}
 	}
-	float norme = pow_sum(accel);
-	norme = sqrt(norme);
-	if(norme>0){
-		for(int i=0;i<3;i++){
-			accel[i]/=norme;
+	else{
+		for(int i = 0;i<3;i++){
+			accel[i] = temp[i];
 		}
 	}
 }
@@ -142,7 +156,7 @@ void ahrs::UpdateGyrometer(float gp, float gq, float gr){
 	}
 	else{
 		for(int i = 0;i<3;i++){
-			gyro[i] = temp[i];//Low pass
+			gyro[i] = temp[i];
 		}
 	}
 }
@@ -236,16 +250,16 @@ void ahrs::Update(){
 		}
 
 		std::vector<float> temp1(3);
-		temp1=cross_product(R[2],accel);
+		temp1=this->cross_product(R[2],accel);
 
 		std::vector<float> temp2(3);
-		temp2=cross_product(R[0],magn);
+		temp2=this->cross_product(R[0],magn);
 
 		std::vector<float> temp(3);
 		temp=cross_product(accel,magn);
 
 		std::vector<float> temp3(3);
-		temp3=cross_product(R[1],temp);
+		temp3=this->cross_product(R[1],temp);
 		for(int i = 0;i<3;i++)
 			corr[i]=0;
 		for(int i = 0;i<3;i++){
@@ -281,11 +295,11 @@ void ahrs::Update(){
 			R[1][i]=R[1][i]-(variation/2)*R[0][i];
 		}
 		//Z=XxY
-		R[2]=cross_product(R[0],R[1]);
+		R[2]=this->cross_product(R[0],R[1]);
 		//Normalization
 		float square[3];
 		for(int i=0;i<3;i++){
-			square[i]=pow_sum(R[i]);
+			square[i]=this->pow_sum(R[i]);
 			square[i]=1/sqrt(square[i]);
 			for(int j=0;j<3;j++){
 				R[i][j]*=square[i];
@@ -310,8 +324,8 @@ float ahrs::pow_sum(std::vector<float> V){
  */
 std::vector<float> ahrs::MatToQua(std::vector< std::vector<float> > V){
 	std::vector<float> Q(4,0.0);
-	float trace = V[0][0] + V[1][1] + V[2][2]; // I removed + 1.0f; see discussion with Ethan
-	if( trace > 0 ) {// I changed M_EPSILON to 0
+	float trace = V[0][0] + V[1][1] + V[2][2];
+	if( trace > 0 ) {
 		float s = 0.5f / sqrtf(trace+ 1.0f);
 		Q[0] = 0.25f / s;
 		Q[1] = ( V[2][1] - V[1][2] ) * s;
@@ -441,7 +455,7 @@ std::vector<float> ahrs::kalman_update(std::vector<float> V){
 		W[i][0]+=K[i][0]*Y[i];
 		W[i][1]+=K[i][1]*Y[i];
 	}
-	//myfile << V[0] << "	" << V[1] << "	" << V[2] << "	";
+
 	////////////////////////////
 	//Send corrected
 	for(int i=0;i<3;i++){
@@ -449,8 +463,6 @@ std::vector<float> ahrs::kalman_update(std::vector<float> V){
 		V[i]=V[i]*(1-Kal)+W[i][1]*Kal;
 	}
 	////////////////////////////
-	//myfile << V[0] << "	" << V[1] << "	" << V[2] << "\n";
-	//printR(0,V);
 
 	//Predict
 	for(int i=0;i<3;i++){
@@ -682,5 +694,4 @@ void ahrs::Etalonnage(){
 	printf("\n");
 	printf("Etalonnage terminé\n");
 	initialized=true;
-	this->Initialize();
 }

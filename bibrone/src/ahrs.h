@@ -35,11 +35,11 @@ public:
 		old(3,0.0)
 	{
 		/*
-		 * Empiriquement Kp=15 Ki=100
+		 * Empiriquement Kp=1 Ki=0.5
 		 */
 		dt=0.010;
-		Kp=0.3;
-		Ki=2;
+		Kp=1;
+		Ki=0.5;
 		Ka=1;
 		Km=0.2;
 		Kt=1;
@@ -47,15 +47,20 @@ public:
 		for(int i=0;i<3;i++)
 			R[i][i]=1;
 		Qua[0]=1;
-		kalman_filter=false;
-		quaternion=false;
+		kalman_filter=true;
+		quaternion=true;
 		gravity=1;
 		initialized=false;
 	};
 	//A lancer au moins une fois avant chaque série d'utilisation
 	//Ecrit dans le fichier "config.txt"
 	void Etalonnage();
-
+	//Permettent de lancer l'AHRS en tâche de fond
+	void Start();
+	void Stop();
+	//Permet de spécifier l'interval de mise à jour de l'AHRS (en secondes)
+	void Start(float dt);
+	//Autres fonctions, voir documentation
 	void Update(float mx, float my, float mz, float ax, float ay, float az, float gp, float gq, float gr);
 	void UpdateMagnetometer(float mx, float my, float mz);
 	void UpdateAccelerometer(float ax, float ay, float az);
