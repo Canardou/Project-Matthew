@@ -24,7 +24,7 @@ void printR(int n, std::vector< std::vector<float> > V){
 	printf("╮\n");
 	for(unsigned int i=0;i<V.size();i++){
 		for(unsigned int j=0;j<V[i].size();j++){
-			printf("│%9.2g",V[i][j]);
+			printf("│%9.3g",V[i][j]);
 		}
 		printf("│\n");
 		if(i+1<V.size()){
@@ -50,7 +50,7 @@ void printR(int n, std::vector<float> V){
 	}
 	printf("╮\n");
 	for(unsigned int j=0;j<V.size();j++){
-		printf("│%9.2g",V[j]);
+		printf("│%9.3g",V[j]);
 	}
 	printf("│\n");
 
@@ -80,7 +80,7 @@ int main(){
 	int j=0;
 	int k=0;
 	int i=0;
-	while (j<=10000) {
+	while (j<=20000) {
 		Navdata::update () ;
 		Navdata::IMU::update () ;
 
@@ -106,11 +106,11 @@ int main(){
 			k=0;
 		}
 
-		if(j>5000 && j<=10000)
-			std::fprintf(file,"%f	%f	%f	%f	%f	%f	%f	%f	%f	%f	%f	%f	%f	%f	%f	%f\n"
-					,mx,my,mz,ax,ay,az,gx,gy,gz,
-					test.GetQuaternion()[0],test.GetQuaternion()[1],test.GetQuaternion()[2],test.GetQuaternion()[3],
-					test.GetEuler()[0],test.GetEuler()[1],test.GetEuler()[2]);
+		//if(j>5000 && j<=10000)
+			//std::fprintf(file,"%f	%f	%f	%f	%f	%f	%f	%f	%f	%f	%f	%f	%f	%f	%f	%f\n"
+			//		,mx,my,mz,ax,ay,az,gx,gy,gz,
+			//		test.GetQuaternion()[0],test.GetQuaternion()[1],test.GetQuaternion()[2],test.GetQuaternion()[3],
+			//		test.GetEuler()[0],test.GetEuler()[1],test.GetEuler()[2]);
 
 		if(i>=100)
 		{

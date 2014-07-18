@@ -38,8 +38,8 @@ public:
 		 * Empiriquement Kp=1 Ki=0.5
 		 */
 		dt=0.010;
-		Kp=1;
-		Ki=0.5;
+		Kp=100;
+		Ki=5;
 		Ka=1;
 		Km=0.2;
 		Kt=1;
