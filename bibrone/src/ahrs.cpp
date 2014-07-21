@@ -11,6 +11,17 @@
 #include "ahrs.h"
 
 
+struct param
+{
+	ahrs* nouveau;
+	float dt;
+};
+
+pthread_t thread_recup_data, thread_kalman;
+pthread_attr_t attr, attr2, *attrp, *attrp2;
+
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
 /*
  * Met à jour les données du magnétomètre, accéléromètre et gyroscope en même temps
  */
@@ -360,9 +371,11 @@ std::vector<float> ahrs::MatToQua(std::vector< std::vector<float> > V){
  * Renvoit le quaternion
  */
 std::vector<float> ahrs::GetQuaternion() {
+	pthread_mutex_lock(&mutex);
 	if(!quaternion){
 		Qua = ahrs::MatToQua(R);
 	}
+	pthread_mutex_unlock(&mutex);
 	return Qua;
 }
 
@@ -370,6 +383,7 @@ std::vector<float> ahrs::GetQuaternion() {
  * Renvoit la matrice de rotation
  */
 std::vector< std::vector<float> > ahrs::GetRotationMatrix(){
+	pthread_mutex_lock(&mutex);
 	if(quaternion){
 		float sqx = Qua[1]*Qua[1];
 		float sqy = Qua[2]*Qua[2];
@@ -393,6 +407,7 @@ std::vector< std::vector<float> > ahrs::GetRotationMatrix(){
 		R[2][1] = 2.0 * (tmp1 + tmp2) ;
 		R[1][2] = 2.0 * (tmp1 - tmp2) ;
 	}
+	pthread_mutex_unlock(&mutex);
 	return R;
 }
 
@@ -520,6 +535,7 @@ std::vector< std::vector<float> > ahrs::multiply(std::vector< std::vector<float>
 std::vector<float> ahrs::GetEuler(){
 	std::vector<float> retour(3,0.0);
 	//Phi,Theta,Psi
+	pthread_mutex_lock(&mutex);
 	if(!quaternion)
 		Qua=this->MatToQua(R);
 	float temp=2*Qua[1]*Qua[3]+2*Qua[0]*Qua[2];
@@ -529,6 +545,7 @@ std::vector<float> ahrs::GetEuler(){
 	for(int i=0;i<3;i++){
 		retour[i]*=360/(2*M_PI);
 	}
+	pthread_mutex_unlock(&mutex);
 	return retour;
 }
 
@@ -540,6 +557,8 @@ void ahrs::Etalonnage(){
 	float ax,ay,az,mx,my,mz,gx,gy,gz;
 	Navdata::init();
 	file=std::fopen("config.txt","w");
+	ahrs etalon;
+	bool save=this->quaternion;
 	this->SetQuaternion(true);
 	int etalonnage=0;
 	mx = -Navdata::IMU::Magnetometer::getY();
@@ -694,24 +713,9 @@ void ahrs::Etalonnage(){
 	printf("\n");
 	printf("Etalonnage terminé\n");
 	initialized=true;
+	this->SetQuaternion(save);
+	this->Initialize();
 }
-
-
-
-
-
-
-
-
-struct param
-{
-	ahrs* nouveau;
-};
-
-	pthread_t thread_recup_data, thread_kalman;
-	pthread_attr_t attr, attr2, *attrp, *attrp2;
-
-	pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 struct periodic_info
 {
@@ -767,8 +771,9 @@ static void wait_period (struct periodic_info *info)
 
 
 //Tache du thread recuperation data
-static void *thread_recup(void *arg)
+static void *thread_recup(void *parametres)
 {	
+	struct param *pp = (struct param *)parametres;
 	struct periodic_info info;
 	float gx = 0, gy = 0, gz = 0 ;
 	float mx = 0, my = 0, mz = 0 ;
@@ -777,11 +782,9 @@ static void *thread_recup(void *arg)
 	int j=0;
 	int k=0;
 	int i=0;
-
 	make_periodic (2000, &info);
 	while (1)
 	{
-		pthread_mutex_lock(&mutex);
 		Navdata::update () ;
 		Navdata::IMU::update () ;
 
@@ -796,24 +799,10 @@ static void *thread_recup(void *arg)
 		mx = -Navdata::IMU::Magnetometer::getY();
 		my = Navdata::IMU::Magnetometer::getX();
 		mz = Navdata::IMU::Magnetometer::getZ();
-
-		test.UpdateAccelerometer(ax,ay,az);
-		test.UpdateMagnetometer(mx,my,mz);
-		test.UpdateGyrometer(gx,gy,gz);
-
-		if(j>5000 && j<=10000)
-			std::fprintf(file,"%f	%f	%f	%f	%f	%f	%f	%f	%f	%f	%f	%f	%f	%f	%f	%f\n"
-					,mx,my,mz,ax,ay,az,gx,gy,gz,
-					test.GetQuaternion()[0],test.GetQuaternion()[1],test.GetQuaternion()[2],test.GetQuaternion()[3],
-					test.GetEuler()[0],test.GetEuler()[1],test.GetEuler()[2]);
-
-		if(i>=100)
-		{
-			printR(j,test.GetEuler());
-			i=0;
-		}
-		i++;
-		j++;
+		pthread_mutex_lock(&mutex);
+		pp->nouveau->UpdateAccelerometer(ax,ay,az);
+		pp->nouveau->UpdateMagnetometer(mx,my,mz);
+		pp->nouveau->UpdateGyrometer(gx,gy,gz);
 		pthread_mutex_unlock(&mutex);
 		wait_period (&info);
 	}
@@ -827,8 +816,7 @@ static void *thread_cor(void *parametres)
 {
 	struct periodic_info info;
 	struct param *pp = (struct param *)parametres;
-
-	make_periodic (10000, &info);	
+	make_periodic((int)(pp->dt*1000000), &info);
 	while(1)
 	{
 		pthread_mutex_lock(&mutex);
@@ -840,14 +828,20 @@ static void *thread_cor(void *parametres)
   return NULL;
 }
 
+void ahrs::Start(float dt){
+	this->Set(dt);
+	this->Start();
+}
 
+struct param p;
 
 void ahrs::Start(){
 	int s, inheritsched, policy;
 	struct sched_param param;
-	struct param p;
 	p.nouveau = this;
+	p.dt=this->dt;
 
+	Navdata::init();
 
 //CONFIGURATION DES OPTIONS
 
@@ -855,11 +849,9 @@ void ahrs::Start(){
 	
 	/* Optionally set scheduling attributes of main thread,
 	   and display the attributes */
-
 	//Configuration de la politique d'ordonancement et de la priorite du main	
 	policy = SCHED_FIFO;
 	param.sched_priority = 90;
-
 	s = pthread_setschedparam(pthread_self(), policy, &param);
 	if (s != 0)
 		handle_error_en(s, "pthread_setschedparam");
@@ -868,14 +860,12 @@ void ahrs::Start(){
 //################## THREAD RECUPERATION DATA ##################
 
 	attrp = NULL;
-
 	s = pthread_attr_init(&attr);
 	if (s != 0)
 		handle_error_en(s, "pthread_attr_init");
 
 	attrp = &attr;
 	inheritsched = PTHREAD_EXPLICIT_SCHED;
-
 	s = pthread_attr_setinheritsched(&attr, inheritsched);
 	if (s != 0)
 		handle_error_en(s, "pthread_attr_setinheritsched");
@@ -900,7 +890,6 @@ void ahrs::Start(){
 //################## THREAD KALMAN ##################
 	
 	/* Initialize thread attributes object */
-
 	attrp2 = NULL;
 	s = pthread_attr_init(&attr2);
 	
@@ -942,7 +931,7 @@ void ahrs::Start(){
 
 //CREATION DES THREADS
 	//Creation du thread recuperation data
-	s = pthread_create(&thread_recup_data, attrp, &thread_recup, NULL);
+	s = pthread_create(&thread_recup_data, attrp, &thread_recup, &p);
 	if (s != 0)
 		handle_error_en(s, "pthread_create");
 

@@ -7,7 +7,7 @@ BIBRONE_PATH=".."
 INCLUDES=-I$(BIBRONE_PATH)/include/
 DRONEFLAGS= -march=armv7-a
 CFLAGS =-W -Wall -Wextra $(DRONEFLAGS) $(INCLUDES)
-LDFLAGS =-L$(BIBRONE_PATH)/lib -lbibrone -lm
+LDFLAGS =-L$(BIBRONE_PATH)/lib -lbibrone -lm -lpthread
 
 SRC=  $(wildcard *.cpp)
 EXEC= $(SRC:.cpp=.elf)

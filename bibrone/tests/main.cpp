@@ -62,6 +62,20 @@ void printR(int n, std::vector<float> V){
 }
 
 int main(){
+	ahrs test;
+	test.Initialize();
+	test.SetQuaternion(true);
+	test.SetKalman(false);
+	test.Start(0.01);
+	int j=0;
+	while(j<100){
+		usleep(100000);
+		printR(j,test.GetEuler());
+		j++;
+	}
+}
+
+/*int main(){
 	FILE * file;
 	float gx = 0, gy = 0, gz = 0 ;
 	float mx = 0, my = 0, mz = 0 ;
@@ -123,4 +137,4 @@ int main(){
 	}
 	std::fclose(file);
 	return 0;
-}
+}*/
