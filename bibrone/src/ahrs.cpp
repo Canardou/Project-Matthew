@@ -36,34 +36,36 @@ void ahrs::Update(float mx, float my, float mz, float ax, float ay, float az, fl
  * Initialise l'ahrs avec les données accéléromètre et magnétomètre
  */
 void ahrs::Initialize(){
-	if(initialized==false){
-		std::FILE * file;
-		if((file=std::fopen("config.txt","r"))){
+	if(started==false){
+		if(initialized==false){
+			std::FILE * file;
+			if(!(file=std::fopen("config.txt","r"))){
+				this->Etalonnage();
+				file=std::fopen("config.txt","r");
+			}
 			fscanf(file,"%f\n",&gravity);
 			for(int i=0;i<3;i++){
 				fscanf(file,"%f %f\n",&max_magn[i],&min_magn[i]);
 			}
 			initialized=true;
 		}
-		else
-			this->Etalonnage();
-	}
-	std::vector<float> temp(3);
-	for(int i=0;i<3;i++){
-		for(int j=0;j<3;j++){
-			if(i!=j)
-				R[i][j]=0;
-			else
-				R[i][j]=1;
+		std::vector<float> temp(3);
+		for(int i=0;i<3;i++){
+			for(int j=0;j<3;j++){
+				if(i!=j)
+					R[i][j]=0;
+				else
+					R[i][j]=1;
+			}
 		}
-	}
-	Qua=ahrs::MatToQua(R);
-	Q[0][0]=Q[1][1]=0.001;
-	Q[1][0]=Q[0][1]=0;
-	for(int i=0;i<3;i++){
-		for(int j=0;j<2;j++){
-			for(int k=0;k<2;k++){
-				P[i][j][k]=0;
+		Qua=ahrs::MatToQua(R);
+		Q[0][0]=Q[1][1]=0.0001;
+		Q[1][0]=Q[0][1]=0;
+		for(int i=0;i<3;i++){
+			for(int j=0;j<2;j++){
+				for(int k=0;k<2;k++){
+					P[i][j][k]=0;
+				}
 			}
 		}
 	}
@@ -73,16 +75,25 @@ void ahrs::Initialize(){
  * Spécifie le temps d'échantillonage
  */
 void ahrs::Set(float dt){
-	this->dt=dt;
+	if(started==false){
+		if(dt<0.02)
+			this->dt=0.02;
+		else
+			this->dt=dt;
+	}
 }
 
 /*
  * Permet de spécifier le temps déchantillonage, le coefficient intégrateur et proportionnel du correcteur
  */
 void ahrs::Set(float dt, float ki, float kp){
-	this->Set(dt);
-	this->Ki=ki;
-	this->Kp=kp;
+	if(started==false){
+		this->Set(dt);
+		if(ki>=0)
+			this->Ki=ki;
+		if(kp>=0)
+			this->Kp=kp;
+	}
 }
 
 /*
@@ -90,10 +101,15 @@ void ahrs::Set(float dt, float ki, float kp){
  * La confiance accordée à l'acceleromètre et magnétomètre et le coefficient de confiance du correcteur total
  */
 void ahrs::Set(float dt, float ki, float kp, float ka, float km, float kt){
-	this->Set(dt,ki,kp);
-	this->Ka=ka;
-	this->Km=km;
-	this->Kt=kt;
+	if(started==false){
+		this->Set(dt,ki,kp);
+		if(ka>=0)
+			this->Ka=ka;
+		if(km>=0)
+			this->Km=km;
+		if(kt>=0)
+			this->Kt=kt;
+	}
 }
 
 /*
@@ -215,13 +231,13 @@ void ahrs::Update(){
 		vy = 2 * (q1q2 + q3q4);
 		vz = q1q1 - q2q2 - q3q3 + q4q4;
 		wx = 2 * bx * (0.5 - q3q3 - q4q4) + 2 * bz * (q2q4 - q1q3);
-		wy = 2 * bx * (q2q3 - q1q4) + 2 * bz * (q1q2 + q3q4);
+		wy = 2 * bx * (q2q3 - q1q4) + 2 * bz * (q1q2 + q3q4) ;
 		wz = 2 * bx * (q1q3 + q2q4) + 2 * bz * (0.5 - q2q2 - q3q3);
 
 		// Error is cross product between estimated direction and measured direction of gravity
-		ex = (2*Ka*(ay * vz - az * vy) + 2*Km*(my * wz - mz * wy))/(Ka+Km);
-		ey = (2*Ka*(az * vx - ax * vz) + 2*Km*(mz * wx - mx * wz))/(Ka+Km);
-		ez = (2*Ka*(ax * vy - ay * vx) + 2*Km*(mx * wy - my * wx))/(Ka+Km);
+		ex = (Ka*(ay * vz - az * vy) + Km*(my * wz - mz * wy))/(Ka+Km);
+		ey = (Ka*(az * vx - ax * vz) + Km*(mz * wx - mx * wz))/(Ka+Km);
+		ez = (Ka*(ax * vy - ay * vx) + Km*(mx * wy - my * wx))/(Ka+Km);
 		corri[0] += ex; // accumulate integral error
 		corri[1] += ey;
 		corri[2] += ez;
@@ -275,8 +291,8 @@ void ahrs::Update(){
 			corr[i]=0;
 		for(int i = 0;i<3;i++){
 			corr[i]+=temp1[i];
-			corr[i]+=temp2[i];
-			corr[i]+=temp3[i];
+			corr[i]+=temp2[i]/2;
+			corr[i]+=temp3[i]/2;
 		}
 		for(int i = 0;i<3;i++){
 			corri[i]=corri[i]+Ki*corr[i]*dt;
@@ -415,22 +431,29 @@ std::vector< std::vector<float> > ahrs::GetRotationMatrix(){
  * Permet de choisir la confiance accordée au filtre de kalman
  */
 void ahrs::SetKalman(float kal){
-	this->SetKalman(true);
-	this->Kal=kal;
+	if(started==false){
+		this->SetKalman(true);
+		if(kal>=0)
+			this->Kal=kal;
+	}
 }
 
 /*
  * Permet de spécifier si kalman est utilisé
  */
 void ahrs::SetKalman(bool use){
-	kalman_filter=use;
+	if(started==false){
+		kalman_filter=use;
+	}
 }
 
 /*
  * Permet de spécifier l'utilisation des quaternions dans les calculs
  */
 void ahrs::SetQuaternion(bool use){
-	quaternion=use;
+	if(started==false){
+		quaternion=use;
+	}
 }
 
 /*
@@ -440,7 +463,7 @@ std::vector<float> ahrs::kalman_update(std::vector<float> V){
 	float Y[3]={0};
 	float K[3][2]={{0}};
 	float S;
-	float R=0.1;
+	float R=0.01;
 	//Mise à jour
 	//K = P*H^*S (S=R+HPH^)
 	for(int i=0;i<3;i++){
@@ -558,15 +581,14 @@ void ahrs::Etalonnage(){
 	Navdata::init();
 	file=std::fopen("config.txt","w");
 	ahrs etalon;
-	bool save=this->quaternion;
-	this->SetQuaternion(true);
+	etalon.SetQuaternion(true);
 	int etalonnage=0;
-	mx = -Navdata::IMU::Magnetometer::getY();
-	my = Navdata::IMU::Magnetometer::getX();
-	mz = Navdata::IMU::Magnetometer::getZ();
-	max_magn[0]=min_magn[0]=mx;
-	max_magn[1]=min_magn[1]=my;
-	max_magn[2]=min_magn[2]=mz;
+	mx = AHRS_HPP_MX * Navdata::IMU::Magnetometer::getY();
+	my = AHRS_HPP_MY * Navdata::IMU::Magnetometer::getX();
+	mz = AHRS_HPP_MZ * Navdata::IMU::Magnetometer::getZ();
+	etalon.max_magn[0]=etalon.min_magn[0]=mx;
+	etalon.max_magn[1]=etalon.min_magn[1]=my;
+	etalon.max_magn[2]=etalon.min_magn[2]=mz;
 	float angle_min=0;
 	float angle_max=0;
 	float avancement=0;
@@ -576,7 +598,7 @@ void ahrs::Etalonnage(){
 		printf("-");
 	}
 	printf("\r");fflush(stdout);
-	gravity=0;
+	etalon.gravity=0;
 	float iterations=0;
 	while(etalonnage<5000){
 		for(int i=0;i<5;i++){
@@ -587,35 +609,35 @@ void ahrs::Etalonnage(){
 			gy = Navdata::IMU::Gyroscope::getY();
 			gz = Navdata::IMU::Gyroscope::getZ();
 
-			ax = Navdata::IMU::Accelerometer::getX();
-			ay = -Navdata::IMU::Accelerometer::getY();
-			az = -Navdata::IMU::Accelerometer::getZ();
+			ax = AHRS_HPP_AX * Navdata::IMU::Accelerometer::getX();
+			ay = AHRS_HPP_AY * Navdata::IMU::Accelerometer::getY();
+			az = AHRS_HPP_AZ * Navdata::IMU::Accelerometer::getZ();
 
-			mx = -Navdata::IMU::Magnetometer::getY();
-			my = Navdata::IMU::Magnetometer::getX();
-			mz = Navdata::IMU::Magnetometer::getZ();
+			mx = AHRS_HPP_MX * Navdata::IMU::Magnetometer::getY();
+			my = AHRS_HPP_MY * Navdata::IMU::Magnetometer::getX();
+			mz = AHRS_HPP_MZ * Navdata::IMU::Magnetometer::getZ();
 
-			this->UpdateAccelerometer(ax,ay,az);
-			this->UpdateMagnetometer(mx,my,mz);
-			this->UpdateGyrometer(gx,gy,gz);
-			if(mx>max_magn[0] || max_magn[0]==0)
-				max_magn[0]=mx;
-			else if(mx<min_magn[0] || min_magn[0]==0)
+			etalon.UpdateAccelerometer(ax,ay,az);
+			etalon.UpdateMagnetometer(mx,my,mz);
+			etalon.UpdateGyrometer(gx,gy,gz);
+			if(mx>etalon.max_magn[0] || etalon.max_magn[0]==0)
+				etalon.max_magn[0]=mx;
+			else if(mx<etalon.min_magn[0] || etalon.min_magn[0]==0)
 				min_magn[0]=mx;
-			if(my>max_magn[1] || max_magn[1]==0)
-				max_magn[1]=my;
-			else if(my<min_magn[1] || min_magn[1]==0)
-				min_magn[1]=my;
-			if(mz>max_magn[2] || max_magn[2]==0)
-				max_magn[2]=mz;
-			else if(mz<min_magn[2] || min_magn[2]==0)
-				min_magn[2]=mz;
-			gravity+=az;
+			if(my>etalon.max_magn[1] || etalon.max_magn[1]==0)
+				etalon.max_magn[1]=my;
+			else if(my<etalon.min_magn[1] || etalon.min_magn[1]==0)
+				etalon.min_magn[1]=my;
+			if(mz>etalon.max_magn[2] || etalon.max_magn[2]==0)
+				etalon.max_magn[2]=mz;
+			else if(mz<etalon.min_magn[2] || etalon.min_magn[2]==0)
+				etalon.min_magn[2]=mz;
+			etalon.gravity+=az;
 			iterations++;
 		}
-		if(pow_sum(magn)!=0){
-			this->Update();
-			float temp=this->GetQuaternion()[0];
+		if(pow_sum(etalon.magn)!=0){
+			etalon.Update();
+			float temp=etalon.GetQuaternion()[0];
 			if(temp>angle_max)
 				angle_max=temp;
 			else if(temp<angle_min)
@@ -636,8 +658,8 @@ void ahrs::Etalonnage(){
 			etalonnage++;
 		}
 	}
-	gravity/=iterations;
-	fprintf(file,"%f\n",gravity);
+	etalon.gravity/=iterations;
+	fprintf(file,"%f\n",etalon.gravity);
 	printf("\n");
 	printf("Effectuez un à deux tours avec le drone placé à la verticale\n");
 	angle_min=0;
@@ -658,33 +680,33 @@ void ahrs::Etalonnage(){
 			gy = Navdata::IMU::Gyroscope::getY();
 			gz = Navdata::IMU::Gyroscope::getZ();
 
-			ax = Navdata::IMU::Accelerometer::getX();
-			ay = -Navdata::IMU::Accelerometer::getY();
-			az = -Navdata::IMU::Accelerometer::getZ();
+			ax = AHRS_HPP_AX * Navdata::IMU::Accelerometer::getX();
+			ay = AHRS_HPP_AY * Navdata::IMU::Accelerometer::getY();
+			az = AHRS_HPP_AZ * Navdata::IMU::Accelerometer::getZ();
 
-			mx = -Navdata::IMU::Magnetometer::getY();
-			my = Navdata::IMU::Magnetometer::getX();
-			mz = Navdata::IMU::Magnetometer::getZ();
+			mx = AHRS_HPP_MX * Navdata::IMU::Magnetometer::getY();
+			my = AHRS_HPP_MY * Navdata::IMU::Magnetometer::getX();
+			mz = AHRS_HPP_MZ * Navdata::IMU::Magnetometer::getZ();
 
-			this->UpdateAccelerometer(ax,ay,az);
-			this->UpdateMagnetometer(mx,my,mz);
-			this->UpdateGyrometer(gx,gy,gz);
-			if(mx>max_magn[0])
-				max_magn[0]=mx;
-			else if(mx<min_magn[0])
-				min_magn[0]=mx;
-			if(my>max_magn[1])
-				max_magn[1]=my;
-			else if(my<min_magn[1])
-				min_magn[1]=my;
-			if(mz>max_magn[2])
-				max_magn[2]=mz;
-			else if(mz<min_magn[2])
-				min_magn[2]=mz;
+			etalon.UpdateAccelerometer(ax,ay,az);
+			etalon.UpdateMagnetometer(mx,my,mz);
+			etalon.UpdateGyrometer(gx,gy,gz);
+			if(mx>etalon.max_magn[0])
+				etalon.max_magn[0]=mx;
+			else if(mx<etalon.min_magn[0])
+				etalon.min_magn[0]=mx;
+			if(my>etalon.max_magn[1])
+				etalon.max_magn[1]=my;
+			else if(my<etalon.min_magn[1])
+				etalon.min_magn[1]=my;
+			if(mz>etalon.max_magn[2])
+				etalon.max_magn[2]=mz;
+			else if(mz<etalon.min_magn[2])
+				etalon.min_magn[2]=mz;
 		}
-		if(pow_sum(magn)!=0){
-			this->Update();
-			float temp=this->GetRotationMatrix()[2][1];
+		if(pow_sum(etalon.magn)!=0){
+			etalon.Update();
+			float temp=etalon.GetRotationMatrix()[2][1];
 			if(temp>angle_max)
 				angle_max=temp;
 			else if(temp<angle_min)
@@ -707,14 +729,11 @@ void ahrs::Etalonnage(){
 	}
 	//CONFIG.TXT
 	for(int i=0;i<3;i++){
-		fprintf(file,"%f %f\n",max_magn[i],min_magn[i]);
+		fprintf(file,"%f %f\n",etalon.max_magn[i],etalon.min_magn[i]);
 	}
 	fclose(file);
 	printf("\n");
 	printf("Etalonnage terminé\n");
-	initialized=true;
-	this->SetQuaternion(save);
-	this->Initialize();
 }
 
 struct periodic_info
@@ -792,13 +811,13 @@ static void *thread_recup(void *parametres)
 		gy = Navdata::IMU::Gyroscope::getY();
 		gz = Navdata::IMU::Gyroscope::getZ();
 
-		ax = Navdata::IMU::Accelerometer::getX();
-		ay = -Navdata::IMU::Accelerometer::getY();
-		az = -Navdata::IMU::Accelerometer::getZ();
+		ax = AHRS_HPP_AX * Navdata::IMU::Accelerometer::getX();
+		ay = AHRS_HPP_AY * Navdata::IMU::Accelerometer::getY();
+		az = AHRS_HPP_AZ * Navdata::IMU::Accelerometer::getZ();
 
-		mx = -Navdata::IMU::Magnetometer::getY();
-		my = Navdata::IMU::Magnetometer::getX();
-		mz = Navdata::IMU::Magnetometer::getZ();
+		mx = AHRS_HPP_MX * Navdata::IMU::Magnetometer::getY();
+		my = AHRS_HPP_MY * Navdata::IMU::Magnetometer::getX();
+		mz = AHRS_HPP_MZ * Navdata::IMU::Magnetometer::getZ();
 		pthread_mutex_lock(&mutex);
 		pp->nouveau->UpdateAccelerometer(ax,ay,az);
 		pp->nouveau->UpdateMagnetometer(mx,my,mz);
@@ -829,93 +848,96 @@ static void *thread_cor(void *parametres)
 }
 
 void ahrs::Start(float dt){
-	this->Set(dt);
-	this->Start();
+	if(started==false){
+		this->Set(dt);
+		this->Start();
+	}
 }
 
 struct param p;
 
 void ahrs::Start(){
-	int s, inheritsched, policy;
-	struct sched_param param;
-	p.nouveau = this;
-	p.dt=this->dt;
+	if(started==false){
+		int s, inheritsched, policy;
+		struct sched_param param;
+		p.nouveau = this;
+		p.dt=this->dt;
 
-	Navdata::init();
+		Navdata::init();
 
-//CONFIGURATION DES OPTIONS
+		//CONFIGURATION DES OPTIONS
 
-//######################### MAIN ###########################
-	
-	/* Optionally set scheduling attributes of main thread,
+		//######################### MAIN ###########################
+
+		/* Optionally set scheduling attributes of main thread,
 	   and display the attributes */
-	//Configuration de la politique d'ordonancement et de la priorite du main	
-	policy = SCHED_FIFO;
-	param.sched_priority = 90;
-	s = pthread_setschedparam(pthread_self(), policy, &param);
-	if (s != 0)
-		handle_error_en(s, "pthread_setschedparam");
+		//Configuration de la politique d'ordonancement et de la priorite du main
+		policy = SCHED_FIFO;
+		param.sched_priority = 90;
+		s = pthread_setschedparam(pthread_self(), policy, &param);
+		if (s != 0)
+			handle_error_en(s, "pthread_setschedparam");
 
 
-//################## THREAD RECUPERATION DATA ##################
+		//################## THREAD RECUPERATION DATA ##################
 
-	attrp = NULL;
-	s = pthread_attr_init(&attr);
-	if (s != 0)
-		handle_error_en(s, "pthread_attr_init");
+		attrp = NULL;
+		s = pthread_attr_init(&attr);
+		if (s != 0)
+			handle_error_en(s, "pthread_attr_init");
 
-	attrp = &attr;
-	inheritsched = PTHREAD_EXPLICIT_SCHED;
-	s = pthread_attr_setinheritsched(&attr, inheritsched);
-	if (s != 0)
-		handle_error_en(s, "pthread_attr_setinheritsched");
+		attrp = &attr;
+		inheritsched = PTHREAD_EXPLICIT_SCHED;
+		s = pthread_attr_setinheritsched(&attr, inheritsched);
+		if (s != 0)
+			handle_error_en(s, "pthread_attr_setinheritsched");
 
-	//Configuration de la politique d'ordonancement et de la priorite du thread recuperation data
-	policy = SCHED_FIFO;
-	param.sched_priority = 89;
-	s = pthread_attr_setschedpolicy(&attr, policy);
-	if (s != 0)
-		handle_error_en(s, "pthread_attr_setschedpolicy");
-	
-	s = pthread_attr_setschedparam(&attr, &param);
-	if (s != 0)
-		handle_error_en(s, "pthread_attr_setschedparam");
+		//Configuration de la politique d'ordonancement et de la priorite du thread recuperation data
+		policy = SCHED_FIFO;
+		param.sched_priority = 89;
+		s = pthread_attr_setschedpolicy(&attr, policy);
+		if (s != 0)
+			handle_error_en(s, "pthread_attr_setschedpolicy");
 
-	/*s = pthread_detach(thread_recup_data);
+		s = pthread_attr_setschedparam(&attr, &param);
+		if (s != 0)
+			handle_error_en(s, "pthread_attr_setschedparam");
+
+		/*s = pthread_detach(thread_recup_data);
 	if (s != 0)
 		handle_error_en(s, "pthread_detach");*/
 
 
 
-//################## THREAD KALMAN ##################
-	
-	/* Initialize thread attributes object */
-	attrp2 = NULL;
-	s = pthread_attr_init(&attr2);
-	
-	if (s != 0)
-		handle_error_en(s, "pthread_attr_init");
+		//################## THREAD KALMAN ##################
 
-	attrp2 = &attr2;
-	inheritsched = PTHREAD_EXPLICIT_SCHED;
+		/* Initialize thread attributes object */
+		attrp2 = NULL;
+		s = pthread_attr_init(&attr2);
 
-	s = pthread_attr_setinheritsched(&attr2, inheritsched);
-	if (s != 0)
-		handle_error_en(s, "pthread_attr_setinheritsched");
+		if (s != 0)
+			handle_error_en(s, "pthread_attr_init");
 
-	//Configuration de la politique d'ordonancement et de la priorite des threads secondaires
-	policy = SCHED_FIFO;
-	param.sched_priority = 88;
+		attrp2 = &attr2;
+		inheritsched = PTHREAD_EXPLICIT_SCHED;
 
-	s = pthread_attr_setschedpolicy(&attr2, policy);
-	if (s != 0)
-		handle_error_en(s, "pthread_attr_setschedpolicy");
+		s = pthread_attr_setinheritsched(&attr2, inheritsched);
+		if (s != 0)
+			handle_error_en(s, "pthread_attr_setinheritsched");
 
-	s = pthread_attr_setschedparam(&attr2, &param);
-	if (s != 0)
-		handle_error_en(s, "pthread_attr_setschedparam");
+		//Configuration de la politique d'ordonancement et de la priorite des threads secondaires
+		policy = SCHED_FIFO;
+		param.sched_priority = 88;
 
-	/*s = pthread_detach(thread_kalman);
+		s = pthread_attr_setschedpolicy(&attr2, policy);
+		if (s != 0)
+			handle_error_en(s, "pthread_attr_setschedpolicy");
+
+		s = pthread_attr_setschedparam(&attr2, &param);
+		if (s != 0)
+			handle_error_en(s, "pthread_attr_setschedparam");
+
+		/*s = pthread_detach(thread_kalman);
 	if (s != 0)
 		handle_error_en(s, "pthread_detach");
 
@@ -929,35 +951,40 @@ void ahrs::Start(){
 
 
 
-//CREATION DES THREADS
-	//Creation du thread recuperation data
-	s = pthread_create(&thread_recup_data, attrp, &thread_recup, &p);
-	if (s != 0)
-		handle_error_en(s, "pthread_create");
+		//CREATION DES THREADS
+		//Creation du thread recuperation data
+		s = pthread_create(&thread_recup_data, attrp, &thread_recup, &p);
+		if (s != 0)
+			handle_error_en(s, "pthread_create");
 
-	//Creation du thread kalman
-	s = pthread_create(&thread_kalman, attrp2, &thread_cor, &p);
-	if (s != 0)
-		handle_error_en(s, "pthread_create");
-
+		//Creation du thread kalman
+		s = pthread_create(&thread_kalman, attrp2, &thread_cor, &p);
+		if (s != 0)
+			handle_error_en(s, "pthread_create");
+		this->started=true;
+	}
 }
 
 
 
 void ahrs::Stop(){
-	int s;
+	if(started==true){
+		int s;
 
-//Annulation des threads
-	s = pthread_cancel(thread_recup_data);
-	if (s != 0)
-		handle_error_en(s, "pthread_cancel");
-	s = pthread_cancel(thread_kalman);
-	if (s != 0)
-		handle_error_en(s, "pthread_cancel");
+		//Annulation des threads
+		s = pthread_cancel(thread_recup_data);
+		if (s != 0)
+			handle_error_en(s, "pthread_cancel");
+		s = pthread_cancel(thread_kalman);
+		if (s != 0)
+			handle_error_en(s, "pthread_cancel");
 
-//DESTRUCTION DES ATTRIBUTS POUR LIBERER LA MEMOIRE
-	pthread_attr_destroy(&attr);
-	pthread_attr_destroy(&attr2);
-	pthread_attr_destroy(attrp);
-	pthread_attr_destroy(attrp2);
+		//DESTRUCTION DES ATTRIBUTS POUR LIBERER LA MEMOIRE
+		pthread_attr_destroy(&attr);
+		pthread_attr_destroy(&attr2);
+		pthread_attr_destroy(attrp);
+		pthread_attr_destroy(attrp2);
+
+		this->started=false;
+	}
 }

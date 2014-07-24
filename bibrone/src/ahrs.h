@@ -27,6 +27,14 @@
 #ifndef AHRS_HPP_
 #define AHRS_HPP_
 
+#define AHRS_HPP_MX -1
+#define AHRS_HPP_MY 1
+#define AHRS_HPP_MZ -1
+
+#define AHRS_HPP_AX -1
+#define AHRS_HPP_AY -1
+#define AHRS_HPP_AZ -1
+
 /**
  * La classe ahrs prends les données de capteurs en entrée et retourne les angles d'Euler
  */
@@ -62,6 +70,7 @@ public:
 		quaternion=true;
 		gravity=1;
 		initialized=false;
+		started=false;
 	};
 	//A lancer au moins une fois avant chaque série d'utilisation
 	//Ecrit dans le fichier "config.txt"
@@ -97,6 +106,7 @@ private:
 	bool kalman_filter;
 	bool quaternion;
 	bool initialized;
+	bool started;
 
 	float Kp;
 	float Ki;
