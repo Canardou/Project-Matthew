@@ -17,61 +17,58 @@
 
 void printR(int n, std::vector< std::vector<float> > V){
 	printf("%*d \n",(int)V.size()*6,n);
-	printf("╭‒‒‒‒‒‒‒‒‒");
+	printf("+---------");
 	for(unsigned int i=1;i<V[0].size();i++){
-		printf("┬‒‒‒‒‒‒‒‒‒");
+		printf("+---------");
 	}
-	printf("╮\n");
+	printf("+\n");
 	for(unsigned int i=0;i<V.size();i++){
 		for(unsigned int j=0;j<V[i].size();j++){
 			printf("│%9.3g",V[i][j]);
 		}
 		printf("│\n");
 		if(i+1<V.size()){
-			printf("├‒‒‒‒‒‒‒‒‒");
+			printf("+---------");
 			for(unsigned int j=1;j<V[i].size();j++){
-				printf("┼‒‒‒‒‒‒‒‒‒");
+				printf("+---------");
 			}
-			printf("┤\n");
+			printf("+\n");
 		}
 	}
-	printf("╰‒‒‒‒‒‒‒‒‒");
+	printf("+---------");
 	for(unsigned int i=1;i<V[V.size()-1].size();i++){
-		printf("┴‒‒‒‒‒‒‒‒‒");
+		printf("+---------");
 	}
-	printf("╯\n");
+	printf("+\n");
 }
 
 void printR(int n, std::vector<float> V){
 	printf("%*d \n",(int)V.size()*6,n);
-	printf("╭‒‒‒‒‒‒‒‒‒");
+	printf("+---------");
 	for(unsigned int i=1;i<V.size();i++){
-		printf("┬‒‒‒‒‒‒‒‒‒");
+		printf("+---------");
 	}
-	printf("╮\n");
+	printf("+\n");
 	for(unsigned int j=0;j<V.size();j++){
 		printf("│%9.3g",V[j]);
 	}
 	printf("│\n");
 
-	printf("╰‒‒‒‒‒‒‒‒‒");
+	printf("+---------");
 	for(unsigned int i=1;i<V.size();i++){
-		printf("┴‒‒‒‒‒‒‒‒‒");
+		printf("+---------");
 	}
-	printf("╯\n");
+	printf("+\n");
 }
 
 int main(){
 	ahrs test;
 	test.Initialize();
-	test.SetQuaternion(true);
-	test.SetKalman(true);
-	test.Set(0.01,5,100,0.2,1,1);//KA puis KM
 	test.Start(0.01);
 	int j=0;
 	while(j<500){
 		usleep(100000);
-		std::cout << Navdata::IMU::Magnetometer::getX() << " \ " << Navdata::IMU::Magnetometer::getY() << " \ " << Navdata::IMU::Magnetometer::getZ() << "\n";
+		printR(j,test.GetQuaternion());
 		printR(j,test.GetRotationMatrix());
 		j++;
 	}

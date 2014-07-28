@@ -27,9 +27,13 @@
 #ifndef AHRS_HPP_
 #define AHRS_HPP_
 
-#define AHRS_HPP_MX -1
-#define AHRS_HPP_MY 1
-#define AHRS_HPP_MZ -1
+#define AHRS_HPP_GX 1
+#define AHRS_HPP_GY 1
+#define AHRS_HPP_GZ -1
+
+#define AHRS_HPP_MX 1
+#define AHRS_HPP_MY -1
+#define AHRS_HPP_MZ 1
 
 #define AHRS_HPP_AX -1
 #define AHRS_HPP_AY -1
@@ -39,7 +43,11 @@
  * La classe ahrs prends les données de capteurs en entrée et retourne les angles d'Euler
  */
 class ahrs{
+
 public:
+	std::vector<float> accel;
+	std::vector<float> magn;
+	std::vector<float> gyro;
 	ahrs() :
 		R(3,std::vector<float>(3,0.0)),
 		Q(2,std::vector<float>(2,0.0)),
@@ -126,9 +134,6 @@ private:
 	std::vector<float> corr;
 	std::vector<float> corri;
 	std::vector<float> Qua;
-	std::vector<float> accel;
-	std::vector<float> magn;
-	std::vector<float> gyro;
 	std::vector<float> old;
 };
 #endif /* AHRS_HPP_ */

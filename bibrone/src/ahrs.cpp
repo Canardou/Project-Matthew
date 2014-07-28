@@ -118,9 +118,9 @@ void ahrs::Set(float dt, float ki, float kp, float ka, float km, float kt){
 void ahrs::UpdateMagnetometer(float mx, float my, float mz){
 	std::vector<float> temp(3,0.0);
 	if(max_magn[0]-min_magn[0]!=0 && max_magn[1]-min_magn[1]!=0 && max_magn[2]-min_magn[2]!=0){
-		temp[0]=(mx-min_magn[0]/2)/(max_magn[0]-min_magn[0]);
-		temp[1]=(my-min_magn[1]/2)/(max_magn[1]-min_magn[1]);
-		temp[2]=(mz-min_magn[2]/2)/(max_magn[2]-min_magn[2]);
+		temp[0]=(mx-min_magn[0])/(max_magn[0]-min_magn[0])*2-1;
+		temp[1]=(my-min_magn[1])/(max_magn[1]-min_magn[1])*2-1;
+		temp[2]=(mz-min_magn[2])/(max_magn[2]-min_magn[2])*2-1;
 	}
 	if(!kalman_filter){
 		for(int i = 0;i<3;i++){
@@ -297,7 +297,7 @@ void ahrs::Update(){
 		for(int i = 0;i<3;i++){
 			corri[i]=corri[i]+Ki*corr[i]*dt;
 			corr[i]=Kt*(Kp*corr[i]+corri[i]);
-			gyro[i]-=corr[i];
+			gyro[i]+=corr[i];
 		}
 		//R(t+dt);
 		std::vector< std::vector<float> > dTheta(3,std::vector<float>(3));
@@ -582,9 +582,10 @@ void ahrs::Etalonnage(){
 	file=std::fopen("config.txt","w");
 	ahrs etalon;
 	etalon.SetQuaternion(true);
+	etalon.SetKalman(false);
 	int etalonnage=0;
-	mx = AHRS_HPP_MX * Navdata::IMU::Magnetometer::getY();
-	my = AHRS_HPP_MY * Navdata::IMU::Magnetometer::getX();
+	mx = AHRS_HPP_MX * Navdata::IMU::Magnetometer::getX();
+	my = AHRS_HPP_MY * Navdata::IMU::Magnetometer::getY();
 	mz = AHRS_HPP_MZ * Navdata::IMU::Magnetometer::getZ();
 	etalon.max_magn[0]=etalon.min_magn[0]=mx;
 	etalon.max_magn[1]=etalon.min_magn[1]=my;
@@ -599,27 +600,29 @@ void ahrs::Etalonnage(){
 	}
 	printf("\r");fflush(stdout);
 	etalon.gravity=0;
+
 	float iterations=0;
 	while(etalonnage<5000){
 		for(int i=0;i<5;i++){
 			usleep(2000);
 			Navdata::update();
 			Navdata::IMU::update();
-			gx = Navdata::IMU::Gyroscope::getX();
-			gy = Navdata::IMU::Gyroscope::getY();
-			gz = Navdata::IMU::Gyroscope::getZ();
+			gx = AHRS_HPP_GX * Navdata::IMU::Gyroscope::getX();
+			gy = AHRS_HPP_GY * Navdata::IMU::Gyroscope::getY();
+			gz = AHRS_HPP_GZ * Navdata::IMU::Gyroscope::getZ();
 
 			ax = AHRS_HPP_AX * Navdata::IMU::Accelerometer::getX();
 			ay = AHRS_HPP_AY * Navdata::IMU::Accelerometer::getY();
 			az = AHRS_HPP_AZ * Navdata::IMU::Accelerometer::getZ();
 
-			mx = AHRS_HPP_MX * Navdata::IMU::Magnetometer::getY();
-			my = AHRS_HPP_MY * Navdata::IMU::Magnetometer::getX();
+			mx = AHRS_HPP_MX * Navdata::IMU::Magnetometer::getX();
+			my = AHRS_HPP_MY * Navdata::IMU::Magnetometer::getY();
 			mz = AHRS_HPP_MZ * Navdata::IMU::Magnetometer::getZ();
 
 			etalon.UpdateAccelerometer(ax,ay,az);
 			etalon.UpdateMagnetometer(mx,my,mz);
 			etalon.UpdateGyrometer(gx,gy,gz);
+
 			if(mx>etalon.max_magn[0] || etalon.max_magn[0]==0)
 				etalon.max_magn[0]=mx;
 			else if(mx<etalon.min_magn[0] || etalon.min_magn[0]==0)
@@ -637,13 +640,13 @@ void ahrs::Etalonnage(){
 		}
 		if(pow_sum(etalon.magn)!=0){
 			etalon.Update();
-			float temp=etalon.GetQuaternion()[0];
+			float temp=etalon.GetRotationMatrix()[0][0];
 			if(temp>angle_max)
 				angle_max=temp;
 			else if(temp<angle_min)
 				angle_min=temp;
 			if(angle_max-angle_min>1.95){
-				etalonnage=passage*2500;
+				etalonnage+=2500;
 				angle_max=0;
 				angle_min=0;
 				avancement=0;
@@ -676,16 +679,16 @@ void ahrs::Etalonnage(){
 			usleep(2000);
 			Navdata::update () ;
 			Navdata::IMU::update () ;
-			gx = Navdata::IMU::Gyroscope::getX();
-			gy = Navdata::IMU::Gyroscope::getY();
-			gz = Navdata::IMU::Gyroscope::getZ();
+			gx = AHRS_HPP_GX * Navdata::IMU::Gyroscope::getX();
+			gy = AHRS_HPP_GY * Navdata::IMU::Gyroscope::getY();
+			gz = AHRS_HPP_GZ * Navdata::IMU::Gyroscope::getZ();
 
 			ax = AHRS_HPP_AX * Navdata::IMU::Accelerometer::getX();
 			ay = AHRS_HPP_AY * Navdata::IMU::Accelerometer::getY();
 			az = AHRS_HPP_AZ * Navdata::IMU::Accelerometer::getZ();
 
-			mx = AHRS_HPP_MX * Navdata::IMU::Magnetometer::getY();
-			my = AHRS_HPP_MY * Navdata::IMU::Magnetometer::getX();
+			mx = AHRS_HPP_MX * Navdata::IMU::Magnetometer::getX();
+			my = AHRS_HPP_MY * Navdata::IMU::Magnetometer::getY();
 			mz = AHRS_HPP_MZ * Navdata::IMU::Magnetometer::getZ();
 
 			etalon.UpdateAccelerometer(ax,ay,az);
@@ -712,7 +715,7 @@ void ahrs::Etalonnage(){
 			else if(temp<angle_min)
 				angle_min=temp;
 			if(angle_max-angle_min>1.95){
-				etalonnage=passage*2500;
+				etalonnage+=2500;
 				angle_max=0;
 				angle_min=0;
 				avancement=0;
@@ -807,16 +810,16 @@ static void *thread_recup(void *parametres)
 		Navdata::update () ;
 		Navdata::IMU::update () ;
 
-		gx = Navdata::IMU::Gyroscope::getX();
-		gy = Navdata::IMU::Gyroscope::getY();
-		gz = Navdata::IMU::Gyroscope::getZ();
+		gx = AHRS_HPP_GX * Navdata::IMU::Gyroscope::getX();
+		gy = AHRS_HPP_GY * Navdata::IMU::Gyroscope::getY();
+		gz = AHRS_HPP_GZ * Navdata::IMU::Gyroscope::getZ();
 
 		ax = AHRS_HPP_AX * Navdata::IMU::Accelerometer::getX();
 		ay = AHRS_HPP_AY * Navdata::IMU::Accelerometer::getY();
 		az = AHRS_HPP_AZ * Navdata::IMU::Accelerometer::getZ();
 
-		mx = AHRS_HPP_MX * Navdata::IMU::Magnetometer::getY();
-		my = AHRS_HPP_MY * Navdata::IMU::Magnetometer::getX();
+		mx = AHRS_HPP_MX * Navdata::IMU::Magnetometer::getX();
+		my = AHRS_HPP_MY * Navdata::IMU::Magnetometer::getY();
 		mz = AHRS_HPP_MZ * Navdata::IMU::Magnetometer::getZ();
 		pthread_mutex_lock(&mutex);
 		pp->nouveau->UpdateAccelerometer(ax,ay,az);

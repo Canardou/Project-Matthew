@@ -512,9 +512,6 @@ namespace Navdata {
 				magnetometer[1] =   (float) navdata.my ;
 				magnetometer[2] = - (float) navdata.mz ;
 		
-				for (int i = 0 ; i < 3 ; ++i) {
-					magnetometer[i] = (magnetometer[i] - Magnetometer::Neutral[i]) * Magnetometer::Sensitivity[i] ;
-				}
 
 				/*
 
