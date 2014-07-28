@@ -626,7 +626,7 @@ void ahrs::Etalonnage(){
 			if(mx>etalon.max_magn[0] || etalon.max_magn[0]==0)
 				etalon.max_magn[0]=mx;
 			else if(mx<etalon.min_magn[0] || etalon.min_magn[0]==0)
-				min_magn[0]=mx;
+				etalon.min_magn[0]=mx;
 			if(my>etalon.max_magn[1] || etalon.max_magn[1]==0)
 				etalon.max_magn[1]=my;
 			else if(my<etalon.min_magn[1] || etalon.min_magn[1]==0)
