@@ -122,21 +122,14 @@ void ahrs::UpdateMagnetometer(float mx, float my, float mz){
 		temp[1]=(my-min_magn[1])/(max_magn[1]-min_magn[1])*2-1;
 		temp[2]=(mz-min_magn[2])/(max_magn[2]-min_magn[2])*2-1;
 	}
-	if(!kalman_filter){
-		for(int i = 0;i<3;i++){
-			magn[i] = magn[i]*3/4 + temp[i]/4;//Low pass
-		}
-		float norme = pow_sum(magn);
-		norme = sqrt(norme);
-		if(norme>0){
-			for(int i=0;i<3;i++){
-				magn[i]/=norme;
-			}
-		}
+	for(int i = 0;i<3;i++){
+		magn[i] = magn[i]*3/4 + temp[i]/4;//Low pass
 	}
-	else{
-		for(int i = 0;i<3;i++){
-			magn[i] = temp[i];
+	float norme = pow_sum(magn);
+	norme = sqrt(norme);
+	if(norme>0){
+		for(int i=0;i<3;i++){
+			magn[i]/=norme;
 		}
 	}
 }
@@ -149,21 +142,14 @@ void ahrs::UpdateAccelerometer(float ax, float ay, float az){
 	temp[0]=ax;
 	temp[1]=ay;
 	temp[2]=az;
-	if(!kalman_filter){
-		for(int i = 0;i<3;i++){
-			accel[i] = accel[i]*3/4 + temp[i]/4;//Low pass
-		}
-		float norme = pow_sum(accel);
-		norme = sqrt(norme);
-		if(norme>0){
-			for(int i=0;i<3;i++){
-				accel[i]/=norme;
-			}
-		}
+	for(int i = 0;i<3;i++){
+		accel[i] = accel[i]*3/4 + temp[i]/4;//Low pass
 	}
-	else{
-		for(int i = 0;i<3;i++){
-			accel[i] = temp[i];
+	float norme = pow_sum(accel);
+	norme = sqrt(norme);
+	if(norme>0){
+		for(int i=0;i<3;i++){
+			accel[i]/=norme;
 		}
 	}
 }
@@ -268,14 +254,16 @@ void ahrs::Update(){
 		//PI (drift adjust)
 		variation=0;
 		for(int i = 0;i<3;i++){
+			//Si orthogonaux, variation est nulle
 			variation+=accel[i] * magn[i];
 		}
 		//Verlet integration
+		//On modifie les coordonnées des deux vecteurs pour les rendre orthogonaux
 		for(int i = 0;i<3;i++){
 			accel[i]=accel[i]-(variation*Km/(Ka+Km))*magn[i];
 			magn[i]=magn[i]-(variation*Ka/(Ka+Km))*accel[i];
 		}
-
+		//Calcul du PI
 		std::vector<float> temp1(3);
 		temp1=this->cross_product(R[2],accel);
 
@@ -291,15 +279,16 @@ void ahrs::Update(){
 			corr[i]=0;
 		for(int i = 0;i<3;i++){
 			corr[i]+=temp1[i];
-			corr[i]+=temp2[i]/2;
-			corr[i]+=temp3[i]/2;
+			corr[i]+=temp2[i];
+			corr[i]+=temp3[i];
 		}
+		//On applique le PI
 		for(int i = 0;i<3;i++){
 			corri[i]=corri[i]+Ki*corr[i]*dt;
 			corr[i]=Kt*(Kp*corr[i]+corri[i]);
-			gyro[i]+=corr[i];
+			gyro[i]-=corr[i];
 		}
-		//R(t+dt);
+		//Calcul de R(t+dt);
 		std::vector< std::vector<float> > dTheta(3,std::vector<float>(3));
 		dTheta[0][0]=1;
 		dTheta[0][1]=-gyro[2]*dt;
@@ -558,22 +547,53 @@ std::vector< std::vector<float> > ahrs::multiply(std::vector< std::vector<float>
 std::vector<float> ahrs::GetEuler(){
 	std::vector<float> retour(3,0.0);
 	//Phi,Theta,Psi
+	if(quaternion)
+		this->GetRotationMatrix();
 	pthread_mutex_lock(&mutex);
-	if(!quaternion)
-		Qua=this->MatToQua(R);
+	/** this conversion uses conventions as described on page:
+	*   http://www.euclideanspace.com/maths/geometry/rotations/euler/index.htm
+	*   Coordinate System: right hand
+	*   Positive angle: right hand
+	*   Order of euler angles: heading first, then attitude, then bank
+	*   matrix row column ordering:
+	*   [m00 m01 m02]
+	*   [m10 m11 m12]
+	*   [m20 m21 m22]*/
+	    // Assuming the angles are in radians.
+	if (R[1][0] > 0.998) { // singularity at north pole
+		retour[0] = atan2(R[0][2],R[2][2]);
+		retour[1] = M_PI/2;
+		retour[2] = 0;
+	}
+	else if (R[1][0] < -0.998) { // singularity at south pole
+		retour[0] = atan2(R[0][2],R[2][2]);
+		retour[1] = -M_PI/2;
+		retour[2] = 0;
+	}
+	else {
+		retour[0] = atan2(-R[2][0],R[0][0]);
+		retour[2] = atan2(-R[1][2],R[1][1]);
+		retour[1] = asin(R[1][0]);
+	}
+	for(int i=0;i<3;i++){
+		retour[i]=retour[i]*180/M_PI;
+	}
+	/*
+	 * Initialement avec le quaternion
 	float temp=2*Qua[1]*Qua[3]+2*Qua[0]*Qua[2];
 	retour[0] = atan2(2*Qua[2]*Qua[3]-2*Qua[0]*Qua[1],2*Qua[0]*Qua[0]+2*Qua[3]*Qua[3]-1);
 	retour[1] = -atan(temp/sqrt(1-temp*temp));
 	retour[2] = atan2(2*Qua[1]*Qua[2]-2*Qua[0]*Qua[3],2*Qua[0]*Qua[0]+2*Qua[1]*Qua[1]-1);
 	for(int i=0;i<3;i++){
 		retour[i]*=360/(2*M_PI);
-	}
+	}*/
 	pthread_mutex_unlock(&mutex);
 	return retour;
 }
 
 /*
  * Routine d'étalonnage, suivre les indications à l'écran
+ * Bouger le drone dans tous les sens est aussi possible
  */
 void ahrs::Etalonnage(){
 	std::FILE * file;
@@ -646,7 +666,7 @@ void ahrs::Etalonnage(){
 			else if(temp<angle_min)
 				angle_min=temp;
 			if(angle_max-angle_min>1.95){
-				etalonnage+=2500;
+				etalonnage=2500*passage;
 				angle_max=0;
 				angle_min=0;
 				avancement=0;
@@ -715,7 +735,7 @@ void ahrs::Etalonnage(){
 			else if(temp<angle_min)
 				angle_min=temp;
 			if(angle_max-angle_min>1.95){
-				etalonnage+=2500;
+				etalonnage=2500*passage;
 				angle_max=0;
 				angle_min=0;
 				avancement=0;

@@ -68,7 +68,6 @@ int main(){
 	int j=0;
 	while(j<500){
 		usleep(100000);
-		printR(j,test.GetQuaternion());
 		printR(j,test.GetRotationMatrix());
 		j++;
 	}

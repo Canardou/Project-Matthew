@@ -45,9 +45,6 @@
 class ahrs{
 
 public:
-	std::vector<float> accel;
-	std::vector<float> magn;
-	std::vector<float> gyro;
 	ahrs() :
 		R(3,std::vector<float>(3,0.0)),
 		Q(2,std::vector<float>(2,0.0)),
@@ -134,6 +131,9 @@ private:
 	std::vector<float> corr;
 	std::vector<float> corri;
 	std::vector<float> Qua;
+	std::vector<float> accel;
+	std::vector<float> magn;
+	std::vector<float> gyro;
 	std::vector<float> old;
 };
 #endif /* AHRS_HPP_ */
