@@ -76,6 +76,7 @@ public:
 		gravity=1;
 		initialized=false;
 		started=false;
+		raw=false;
 	};
 	//A lancer au moins une fois avant chaque série d'utilisation
 	//Ecrit dans le fichier "config.txt"
@@ -85,6 +86,8 @@ public:
 	void Stop();
 	//Permet de spécifier l'interval de mise à jour de l'AHRS (en secondes)
 	void Start(float dt);
+	//Permet de récupérer les valeurs bruts dans le fichier samples.csv sir raw mis à vrai
+	void Start(float dt, bool raw);
 	//Autres fonctions, voir documentation
 	void Update(float mx, float my, float mz, float ax, float ay, float az, float gp, float gq, float gr);
 	void UpdateMagnetometer(float mx, float my, float mz);
@@ -112,6 +115,7 @@ private:
 	bool quaternion;
 	bool initialized;
 	bool started;
+	bool raw;
 
 	float Kp;
 	float Ki;

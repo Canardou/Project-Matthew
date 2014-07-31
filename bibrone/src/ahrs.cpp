@@ -15,12 +15,17 @@ struct param
 {
 	ahrs* nouveau;
 	float dt;
+	bool raw;
 };
 
 pthread_t thread_recup_data, thread_kalman;
 pthread_attr_t attr, attr2, *attrp, *attrp2;
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
+struct param p;
+
+FILE * file;
 
 /*
  * Met à jour les données du magnétomètre, accéléromètre et gyroscope en même temps
@@ -821,10 +826,15 @@ static void *thread_recup(void *parametres)
 	float mx = 0, my = 0, mz = 0 ;
 	float ax = 0, ay = 0, az = 0 ;
 
-	int j=0;
-	int k=0;
-	int i=0;
 	make_periodic (2000, &info);
+	bool ouverte=false;
+	int limit = 0;
+	if(pp->raw){
+		if((file = fopen("samples.csv","w"))){
+			ouverte=true;
+			fprintf(file,"gx	gy	gz	ax	ay	az	mx	my	mz\n");
+		}
+	}
 	while (1)
 	{
 		Navdata::update () ;
@@ -841,6 +851,10 @@ static void *thread_recup(void *parametres)
 		mx = AHRS_HPP_MX * Navdata::IMU::Magnetometer::getX();
 		my = AHRS_HPP_MY * Navdata::IMU::Magnetometer::getY();
 		mz = AHRS_HPP_MZ * Navdata::IMU::Magnetometer::getZ();
+		if(pp->raw && ouverte && limit<60000){
+			limit++;
+			fprintf(file,"%f	%f	%f	%f	%f	%f	%f	%f	%f\n",gx,gy,gz,ax,ay,az,mx,my,mz);
+		}
 		pthread_mutex_lock(&mutex);
 		pp->nouveau->UpdateAccelerometer(ax,ay,az);
 		pp->nouveau->UpdateMagnetometer(mx,my,mz);
@@ -870,6 +884,14 @@ static void *thread_cor(void *parametres)
   return NULL;
 }
 
+void ahrs::Start(float dt, bool raw){
+	if(started==false){
+		this->Set(dt);
+		this->raw=raw;
+		this->Start();
+	}
+}
+
 void ahrs::Start(float dt){
 	if(started==false){
 		this->Set(dt);
@@ -877,7 +899,7 @@ void ahrs::Start(float dt){
 	}
 }
 
-struct param p;
+
 
 void ahrs::Start(){
 	if(started==false){
@@ -885,6 +907,8 @@ void ahrs::Start(){
 		struct sched_param param;
 		p.nouveau = this;
 		p.dt=this->dt;
+		p.raw=this->raw;
+
 
 		Navdata::init();
 

@@ -64,9 +64,9 @@ void printR(int n, std::vector<float> V){
 int main(){
 	ahrs test;
 	test.Initialize();
-	test.Start(0.01);
+	test.Start();
 	int j=0;
-	while(j<500){
+	while(j<100){
 		usleep(100000);
 		printR(j,test.GetRotationMatrix());
 		j++;
